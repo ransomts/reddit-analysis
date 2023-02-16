@@ -1,0 +1,120 @@
+# Topic Modeling
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::read_chunk('globals.R')
+```
+
+::: {.panel-tabset}
+
+## Conduct topic modeling
+```{r}
+conduct_lda <- function(sr = "Python", year = 2014) {
+  
+  input_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year)
+
+  message("Opening input directory: ", input_directory)
+  posts <- spark_read_json(sc, path = input_directory, memory = FALSE)
+  message("Running LDA...")
+  lda_betas <- posts %>% ml_lda(~ selftext, 
+                      k = 6, 
+                      max_iter = 1, 
+                      min_token_length = 4,
+                      stop_words = sparklyr::ml_default_stop_words(sc), 
+                      min_df = 5) %>%
+    tidy()
+  message("Computed LDA")
+  return(lda_betas)
+}
+```
+
+## Plot Topics
+```{r}
+plot_betas <- function(betas, sr = "Python", year = "2014") {
+  if (nrow(lda_betas) == 0) { return() }
+  
+  plot <- betas %>% group_by(topic) %>%
+    top_n(15, beta) %>%
+    ungroup() %>%
+    arrange(topic, -beta) %>%
+    mutate(term = reorder(term, beta)) %>%
+    ggplot(aes(term, beta, fill = factor(topic))) +
+    geom_col(show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free") +
+    coord_flip()
+  ggsave(filename = paste0(sr, "-", year, ".png"), plot, path = "plots/")
+}
+```
+
+:::
+
+## Execute the topic modeling
+
+```{r, eval=FALSE}
+<<subs-of-interest>>
+<<years-of-interest>>
+
+for (sub in subs_of_interest) {
+  for (y in years) {
+    if (!file.exists(paste0("data/lda-", sub, "-", y, ".rds"))) {
+      lda_betas <- conduct_lda(sr = sub, year = y)
+      plot_betas(betas = lda_betas, sr = sub, year = y)
+      write_rds(lda_betas, file = paste0("data/lda-", sub, "-", y, ".rds"))
+    } else { message("Already processed ", sub, " ", y)}
+  }
+}
+```
+
+## Topics
+
+### r/python
+
+::: {.panel-tabset}
+
+#### 2014
+```{r, eval=TRUE}
+knitr::include_graphics("plots/Python-2014.png")
+```
+
+#### 2015
+```{r, eval=TRUE}
+knitr::include_graphics("plots/Python-2015.png")
+```
+
+#### 2016
+```{r, eval=TRUE}
+knitr::include_graphics("plots/Python-2016.png")
+```
+
+#### 2017
+```{r, eval=TRUE}
+knitr::include_graphics("plots/Python-2017.png")
+```
+
+:::
+
+### r/learnpython
+
+::: {.panel-tabset}
+
+#### 2014
+```{r, eval=TRUE}
+knitr::include_graphics("plots/learnpython-2014.png")
+```
+
+#### 2015
+```{r, eval=TRUE}
+knitr::include_graphics("plots/learnpython-2015.png")
+```
+
+#### 2016
+```{r, eval=TRUE}
+knitr::include_graphics("plots/learnpython-2016.png")
+```
+
+#### 2017
+```{r, eval=TRUE}
+knitr::include_graphics("plots/learnpython-2017.png")
+```
+
+:::

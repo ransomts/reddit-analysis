@@ -1,0 +1,33 @@
+project:
+  type: book
+  output-dir: docs
+
+book:
+  title: "Reddit Analysis"
+  author: "Tim Ransom"
+  date: "2/14/2023"
+  page-navigation: true
+  chapters:
+    - index.qmd
+    - source-data.qmd
+    - sentiment-analysis.qmd
+    - topic-modeling.qmd
+    - quant-ethnography.qmd
+
+bibliography: references.bib
+
+format:
+  html:
+    # code-tools:
+    #   source: false
+    #   toggle: true
+    theme: cosmo
+    code-block-background: true
+    code-fold: true
+
+editor: source
+
+execute:
+  cache: true
+  freeze: auto  # re-render only when source changes
+

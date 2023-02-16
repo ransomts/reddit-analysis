@@ -1,0 +1,51 @@
+# Quantitative Ethnography
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pak)
+```
+
+## Load Reddit Post Data
+
+```{r}
+Sys.setenv(SPARK_HOME="/software/external/spark/3.3.1")
+Sys.setenv(JAVA_HOME="/software/spackages/linux-rocky8-x86_64/gcc-9.5.0/openjdk-11.0.15_10-xo4fjahmlsjch52sftpoxby6kwbdfoib")
+library(sparklyr)
+
+options(sparklyr.log.console = TRUE)
+config <- spark_config()
+config["sparklyr.shell.driver-memory"] <- "10g"
+config["spark.executor.memory"] <- "15G" # typically 4g
+
+spark_master_info <- Sys.getenv("RSESSION_LOG_FILE") %>% 
+  dirname %>% 
+  paste0("/spark_master.info") %>% 
+  readLines(n = 1)
+
+# master node needs to be modified with each new job
+sc <- spark_connect(master = spark_master_info, config = config)
+
+input_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/Python/2014")
+
+message("Opening input directory: ", input_directory)
+posts <- spark_read_json(sc, path = input_directory, memory = FALSE)
+```
+
+
+## Segment and format data
+
+```{r}
+posts %>% select(selftext) %>% mutate(selftext = str_trim(str_to_lower(selftext))) %>%  filter(!selftext %in% c("", "removed", "deleted")) %>% collect() %>% mutate(selftext = str_squish(selftext)) %>% distinct() %>% arrange(desc(selftext))
+```
+
+
+## Use ncoder to begin the semiautomated coding
+
+```{r}
+library(ncodeR)
+
+```
+
+
+## check reliability with rhor
+
