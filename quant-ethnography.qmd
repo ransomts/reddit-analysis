@@ -3,6 +3,10 @@
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(pak)
+library(sparklyr)
+library(tidyverse)
+library(magrittr)
+library(jsonlite)
 ```
 
 ## Load Reddit Post Data
@@ -25,7 +29,7 @@ spark_master_info <- Sys.getenv("RSESSION_LOG_FILE") %>%
 # master node needs to be modified with each new job
 sc <- spark_connect(master = spark_master_info, config = config)
 
-input_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/Python/2014")
+input_directory <- "/scratch1/tsranso/reddit/subreddit-posts/learnprogramming/2014"
 
 message("Opening input directory: ", input_directory)
 posts <- spark_read_json(sc, path = input_directory, memory = FALSE)
@@ -34,7 +38,7 @@ posts <- spark_read_json(sc, path = input_directory, memory = FALSE)
 
 ## Segment and format data
 
-```{r}
+```{r, eval=FALSE}
 posts %>% select(selftext) %>% mutate(selftext = str_trim(str_to_lower(selftext))) %>%  filter(!selftext %in% c("", "removed", "deleted")) %>% collect() %>% mutate(selftext = str_squish(selftext)) %>% distinct() %>% arrange(desc(selftext))
 ```
 
@@ -44,6 +48,60 @@ posts %>% select(selftext) %>% mutate(selftext = str_trim(str_to_lower(selftext)
 ```{r}
 library(ncodeR)
 
+# Load some data
+data(RS.data)
+rs = RS.data
+
+###
+# Create the Data code
+###
+code.interest = create.code(name = "Interest", expressions = c("computer","programming", "goals"), excerpts = rs$text)
+
+# Handcode 30 excerpts for Data code
+code.data = handcode(code = code.data, n=5)
+
+# Run test to see rho/kappa of current test set
+code.data = test(code = code.data, kappaThreshold = 0.65)
+
+# View the summary, with the calcuated statistics
+summary(code.data)
+
+# Create the People code
+code.people = create.code(name = "Recognition", expressions = c("peers","friends", "teachers", "family", "people"), excerpts = rs$text)
+
+# Handcode 30 excerpts for People code
+code.people = handcode(code = code.people, n=5)
+
+# Run test
+code.people = test(code = code.people, kappaThreshold = 0.65)
+
+summary(code.people)
+
+# Create the People code
+code.people = create.code(name = "Competence", expressions = c("works", "programmed", "broke", "fixed", "wondering"), excerpts = rs$text)
+
+# Handcode 30 excerpts for People code
+code.people = handcode(code = code.people, n=5)
+
+# Run test
+code.people = test(code = code.people, kappaThreshold = 0.65)
+
+summary(code.people)
+
+
+###
+# Generate a CodeSet for all Codes
+###
+code.set = code.set("Demo RS CodeSet", "CodeSet made for the demo", codes = c(code.data, code.people))
+
+# Autocode the full set of excerpts, returning a data.frame
+allcoded = autocode(x = code.set)
+
+# Autocode, returning the Code.Set with codes containing updated $computerSets
+allcoded = autocode(x = code.set, simplify = F)
+
+# Convert the CodeSet directly to a data.frame using each Codes $computerSet
+allcoded.data = as.data.frame(allcoded)
 ```
 
 

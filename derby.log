@@ -1,6 +1,6 @@
 ----------------------------------------------------------------
-Wed Feb 15 20:24:44 EST 2023:
-Booting Derby version The Apache Software Foundation - Apache Derby - 10.14.2.0 - (1828579): instance a816c00e-0186-57d2-e3f7-00002f944b80 
+Fri Feb 17 09:48:59 EST 2023:
+Booting Derby version The Apache Software Foundation - Apache Derby - 10.14.2.0 - (1828579): instance a816c00e-0186-5fd9-9095-00002fe7c170 
 on database directory /home/tsranso/code/reddit-analysis/metastore_db with class loader jdk.internal.loader.ClassLoaders$AppClassLoader@67424e82 
 Loaded from file:/software/external/spark/3.3.1/jars/derby-10.14.2.0.jar
 java.vendor=Eclipse Adoptium
