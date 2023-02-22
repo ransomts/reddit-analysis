@@ -57,29 +57,51 @@ sc <- spark_connect(master = spark_master_info, config = config)
 We need a few functions to read through the Reddit data, for example here's something we can use to get out the text posts for a given subreddit.
 
 ```{r pull posts function def}
-pull_posts_of_subreddit <- function(years = c(2014, 2015, 2016, 2017), 
+pull_posts_of_subreddit <- function(sc = NULL,
+                                    years = c(2014, 2015, 2016, 2017), 
                                     sr = "Python",
                                     write_to_dir = FALSE) {
+  message("Pulling posts for subreddit: ", sr)
+  if (is.null(sc)) {
+    message("Not supplied spark connection")
+    return(NULL)
+  }
   for (year in years) {
     year_dir <- paste0("/scratch1/tsranso/reddit/posts/", year)
-    message("Reading from directory: ", year_dir)
-    message("file exists: ", file.exists(year_dir))
-    posts <- spark_read_json(sc, path = year_dir, memory = FALSE) %>%
-      filter(subreddit %in% c(sr)) %>%
-      mutate(selftext = regexp_replace(selftext, "\\n|&nbsp;|<[^>]*>|[^A-Za-z|']", " ")) %>%
-      mutate(selftext = str_trim(selftext)) %>% 
-      filter(!selftext %in% c("", "deleted", "title", "removed"))
-    
-    if (write_to_dir) {
-      output_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year)
-      message("Writing filtered post data to: ", output_directory)
-      spark_write_json(posts, path = output_directory, mode = "overwrite")
+    message("Checking for cached posts...")
+    if (!file.exists(paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year, "/_SUCCESS"))) {
+      
+      message("Reading from directory: ", year_dir)
+      
+      if (file.exists(year_dir)) {
+        message("Directory does exists: ", file.exists(year_dir))
+        posts <- spark_read_json(sc, path = year_dir, memory = FALSE) %>%
+          filter(subreddit %in% c(sr))
+      } else {
+        message("Directory does not exist: ", year_dir)
+      }
+      
+      if (write_to_dir) {
+        output_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year)
+        message("Writing filtered post data to: ", output_directory)
+        spark_write_json(posts, path = output_directory, mode = "overwrite")
+      }
+      
+      return(posts)
+      
+    } else {
+      message("Previous filtered data found at: ", paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year, "/_SUCCESS"))
     }
+    
   }
-  
-  return(posts)
+  # this is probably bad form
+  return(NULL)
 }
-pull_posts_of_subreddit(write_to_dir = TRUE)
+library("job")
+# not pulling in the spark connection for some reason
+# job::job({ pull_posts_of_subreddit(write_to_dir = TRUE) } )
+
+pull_posts_of_subreddit(sc, write_to_dir = TRUE)
 ```
 
 And another one to get all the comments from a subreddit:
@@ -130,7 +152,7 @@ Let's loop through the subreddits of interest and pull out the text posts! Note 
 #| code-fold: show
 #| eval: false
 for (sub in subs_of_interest) {
-  pull_posts_of_subreddit(sr = sub, write_to_dir = TRUE)
+  pull_posts_of_subreddit(sc, sr = sub, write_to_dir = TRUE)
 }
 ```
 

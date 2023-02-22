@@ -11,7 +11,7 @@ library(jsonlite)
 
 ## Load Reddit Post Data
 
-```{r}
+```{r set up spark}
 Sys.setenv(SPARK_HOME="/software/external/spark/3.3.1")
 Sys.setenv(JAVA_HOME="/software/spackages/linux-rocky8-x86_64/gcc-9.5.0/openjdk-11.0.15_10-xo4fjahmlsjch52sftpoxby6kwbdfoib")
 library(sparklyr)
@@ -29,23 +29,68 @@ spark_master_info <- Sys.getenv("RSESSION_LOG_FILE") %>%
 # master node needs to be modified with each new job
 sc <- spark_connect(master = spark_master_info, config = config)
 
-input_directory <- "/scratch1/tsranso/reddit/subreddit-posts/learnprogramming/2014"
+```
 
-message("Opening input directory: ", input_directory)
-posts <- spark_read_json(sc, path = input_directory, memory = FALSE)
+
+```{r read in posts}
+read_programmer_posts <- function(sc) {
+  for (sub in list.files("/scratch1/tsranso/reddit/subreddit-posts", full.names = TRUE)) {
+    for (input_directory in list.files(sub, full.names = TRUE)) {
+      sr <- basename(dirname(input_directory))
+      #input_directory <- "/scratch1/tsranso/reddit/subreddit-posts/learnprogramming/2014"
+      
+      message("Opening input directory: ", input_directory)
+      
+      posts <- spark_read_json(sc, path = input_directory, memory = FALSE) %>% 
+        mutate(selftext = str_to_lower(selftext), media = NULL, media_embed = NULL) %>% 
+        filter(selftext %like% "%programmer%") %>% collect()
+      write_rds(posts, paste0("data/", sr, ".programmer-posts.rds"))
+    }
+  }
+  
+  programmer_posts <- NULL
+  
+  for (file in list.files(path = "data", pattern = "*programmer-posts.rds", full.names = TRUE)) {
+    new_posts <- read_rds(file) %>% 
+      mutate(secure_media = NULL, secure_media_embed = NULL, created_utc = as.character(created_utc))
+    programmer_posts <- bind_rows(programmer_posts, new_posts)
+  }
+  write_rds(programmer_posts, "data/programmer-posts.rds")
+}
+
+if (!file.exists("data/programmer-posts.rds")) {
+  read_programmer_posts(sc)
+}
+
+programmer_posts <- readRDS("data/programmer-posts.rds")
+```
+
+## A few descriptive stats about our data
+
+```{r}
+library(ggpubr)
+library(ggiraph)
+programmer_posts %>% group_by(domain) %>% summarize(count = n()) %>% arrange(-count)
+programmer_posts %>% group_by(domain) %>% summarize(count = n()) %>% arrange(-count) %>% ggbarplot(x = "domain", y = "count") + rotate_x_text(45)
+```
+
+## A quick LDA
+
+```{r}
+#library(topicmodels)
 ```
 
 
 ## Segment and format data
 
 ```{r, eval=FALSE}
-posts %>% select(selftext) %>% mutate(selftext = str_trim(str_to_lower(selftext))) %>%  filter(!selftext %in% c("", "removed", "deleted")) %>% collect() %>% mutate(selftext = str_squish(selftext)) %>% distinct() %>% arrange(desc(selftext))
+#programmer_posts %>% mutate(selftext = )
 ```
 
 
 ## Use ncoder to begin the semiautomated coding
 
-```{r}
+```{r, eval=FALSE}
 library(ncodeR)
 
 # Load some data
@@ -58,24 +103,24 @@ rs = RS.data
 code.interest = create.code(name = "Interest", expressions = c("computer","programming", "goals"), excerpts = rs$text)
 
 # Handcode 30 excerpts for Data code
-code.data = handcode(code = code.data, n=5)
+code.interest = handcode(code = code.data, n=5)
 
 # Run test to see rho/kappa of current test set
-code.data = test(code = code.data, kappaThreshold = 0.65)
+code.interest = test(code = code.data, kappaThreshold = 0.65)
 
 # View the summary, with the calcuated statistics
 summary(code.data)
 
 # Create the People code
-code.people = create.code(name = "Recognition", expressions = c("peers","friends", "teachers", "family", "people"), excerpts = rs$text)
+code.recognition = create.code(name = "Recognition", expressions = c("peers","friends", "teachers", "family", "people"), excerpts = rs$text)
 
 # Handcode 30 excerpts for People code
-code.people = handcode(code = code.people, n=5)
+code.recognition = handcode(code = code.people, n=5)
 
 # Run test
-code.people = test(code = code.people, kappaThreshold = 0.65)
+code.recognition = test(code = code.people, kappaThreshold = 0.65)
 
-summary(code.people)
+summary(code.recognition)
 
 # Create the People code
 code.people = create.code(name = "Competence", expressions = c("works", "programmed", "broke", "fixed", "wondering"), excerpts = rs$text)
@@ -106,4 +151,10 @@ allcoded.data = as.data.frame(allcoded)
 
 
 ## check reliability with rhor
+
+## exit out of spark session
+
+```{r}
+spark_disconnect(sc)
+```
 

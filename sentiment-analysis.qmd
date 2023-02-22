@@ -81,7 +81,7 @@ Interpretation of these statistical tests needs some special attention here. Bec
 
 ### [r/Python r/learnPython]
 
-```{r, eval=TRUE}
+```{r, eval=FALSE}
 library(ggpubr)
 
 for (year in 2014:2017) {
