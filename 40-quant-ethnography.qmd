@@ -10,13 +10,14 @@ library(jsonlite)
 library(ggiraph)
 library(ncodeR)
 library(rhoR)
+library(styler)
 ```
 
 ## Load Reddit Post Data
 
 ```{r set up spark}
-Sys.setenv(SPARK_HOME="/software/external/spark/3.3.1")
-Sys.setenv(JAVA_HOME="/software/spackages/linux-rocky8-x86_64/gcc-9.5.0/openjdk-11.0.15_10-xo4fjahmlsjch52sftpoxby6kwbdfoib")
+Sys.setenv(SPARK_HOME = "/software/external/spark/3.3.1")
+Sys.setenv(JAVA_HOME = "/software/spackages/linux-rocky8-x86_64/gcc-9.5.0/openjdk-11.0.15_10-xo4fjahmlsjch52sftpoxby6kwbdfoib")
 library(sparklyr)
 
 options(sparklyr.log.console = TRUE)
@@ -24,37 +25,37 @@ config <- spark_config()
 config["sparklyr.shell.driver-memory"] <- "10g"
 config["spark.executor.memory"] <- "15G" # typically 4g
 
-spark_master_info <- Sys.getenv("RSESSION_LOG_FILE") %>% 
-  dirname %>% 
-  paste0("/spark_master.info") %>% 
+spark_master_info <- Sys.getenv("RSESSION_LOG_FILE") %>%
+  dirname() %>%
+  paste0("/spark_master.info") %>%
   readLines(n = 1)
 
 # master node needs to be modified with each new job
 sc <- spark_connect(master = spark_master_info, config = config)
-
 ```
 
 
 ```{r read in posts}
 read_posts_that_contain <- function(sc, pattern) {
-    for (sub in list.files("/scratch1/tsranso/reddit/subreddit-posts", full.names = TRUE)) {
+  for (sub in list.files("/scratch1/tsranso/reddit/subreddit-posts", full.names = TRUE)) {
     for (input_directory in list.files(sub, full.names = TRUE)) {
       sr <- basename(dirname(input_directory))
-      #input_directory <- "/scratch1/tsranso/reddit/subreddit-posts/learnprogramming/2014"
-      
+      # input_directory <- "/scratch1/tsranso/reddit/subreddit-posts/learnprogramming/2014"
+
       message("Opening input directory: ", input_directory)
-      
-      posts <- spark_read_json(sc, path = input_directory, memory = FALSE) %>% 
-        mutate(selftext = str_to_lower(selftext), media = NULL, media_embed = NULL) %>% 
-        filter(selftext %like% "%programmer%") %>% collect()
+
+      posts <- spark_read_json(sc, path = input_directory, memory = FALSE) %>%
+        mutate(selftext = str_to_lower(selftext), media = NULL, media_embed = NULL) %>%
+        filter(selftext %like% "%programmer%") %>%
+        collect()
       write_rds(posts, paste0("data/", sr, ".programmer-posts.rds"))
     }
   }
-  
+
   programmer_posts <- NULL
-  
+
   for (file in list.files(path = "data", pattern = "*programmer-posts.rds", full.names = TRUE)) {
-    new_posts <- read_rds(file) %>% 
+    new_posts <- read_rds(file) %>%
       mutate(secure_media = NULL, secure_media_embed = NULL, created_utc = as.character(created_utc))
     programmer_posts <- bind_rows(programmer_posts, new_posts)
   }
@@ -70,6 +71,9 @@ if (!file.exists("data/programmer-posts.rds")) {
 }
 
 programmer_posts <- readRDS("data/programmer-posts.rds")
+
+programmer_posts %<>%
+  mutate(selftext = str_squish(str_remove_all(str_replace_all(selftext, "\n", " "), "[^[:alnum:] \n]")))
 ```
 
 ## A few descriptive stats about our data
@@ -77,21 +81,75 @@ programmer_posts <- readRDS("data/programmer-posts.rds")
 ```{r}
 library(ggpubr)
 library(ggiraph)
-programmer_posts %>% group_by(domain) %>% summarize(count = n()) %>% arrange(-count)
-programmer_posts %>% group_by(domain) %>% summarize(count = n()) %>% arrange(-count) %>% ggbarplot(x = "domain", y = "count") + rotate_x_text(45)
+programmer_posts %>%
+  group_by(domain) %>%
+  summarize(count = n()) %>%
+  arrange(-count)
+programmer_posts %>%
+  group_by(domain) %>%
+  summarize(count = n()) %>%
+  arrange(-count) %>%
+  ggbarplot(x = "domain", y = "count") + rotate_x_text(45)
 ```
 
 ## A quick LDA
 
 ```{r}
-#library(topicmodels)
+library(quanteda)
+library(topicmodels)
+library(quanteda)
+library(tidytext)
+library(tictoc)
+library(stm)
+library(reshape2)
+
+tic()
+programmer_lda <- programmer_posts %>%
+  corpus(text_field = "selftext", meta = c("subreddit")) %>%
+  tokens(
+    remove_punct = TRUE,
+    remove_symbols = TRUE,
+    remove_numbers = TRUE,
+    remove_url = TRUE
+  ) %>%
+  tokens_remove(c(quanteda::stopwords("english"), quanteda::stopwords(source = "smart"))) %>%
+  tokens_wordstem() %>%
+  dfm() %>%
+  stm(K = 3, init.type = "LDA", verbose = FALSE)
+toc()
+
+summary(programmer_lda)
+
+programmer_topics <- tidy(programmer_lda, matrix = "beta")
+```
+
+### visualize topic modeling
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+programmer_top_terms <- programmer_topics %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 10) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+programmer_top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~topic, scales = "free") +
+  scale_y_reordered()
 ```
 
 
 ## Segment and format data
 
+For segmenting I'm going to be using a post by post frame, and formatting is the removal 
 ```{r, eval=FALSE}
-#programmer_posts %>% mutate(selftext = )
+programmer_posts %<>% select(selftext)
+# programmer_posts %>% mutate(selftext = )
 ```
 
 
@@ -102,41 +160,43 @@ library(ncodeR)
 
 # Load some data
 data(RS.data)
-rs = RS.data
+rs <- RS.data
+
+code.experience <- create.code(name = "Experiences", expressions = c("go to work", excerpts = rs$text))
 
 ###
 # Create the Data code
 ###
-code.interest = create.code(name = "Interest", expressions = c("computer","programming", "goals"), excerpts = rs$text)
+code.interest <- create.code(name = "Interest", expressions = c("computer", "programming", "goals", "trying to understand"), excerpts = rs$text)
 
 # Handcode 30 excerpts for Data code
-code.interest = handcode(code = code.data, n=5)
+code.interest <- handcode(code = code.data, n = 5)
 
 # Run test to see rho/kappa of current test set
-code.interest = test(code = code.data, kappaThreshold = 0.65)
+code.interest <- test(code = code.data, kappaThreshold = 0.65)
 
 # View the summary, with the calcuated statistics
 summary(code.data)
 
 # Create the People code
-code.recognition = create.code(name = "Recognition", expressions = c("peers","friends", "teachers", "family", "people"), excerpts = rs$text)
+code.recognition <- create.code(name = "Recognition", expressions = c("peers", "friends", "teachers", "family", "people"), excerpts = rs$text)
 
 # Handcode 30 excerpts for People code
-code.recognition = handcode(code = code.people, n=5)
+code.recognition <- handcode(code = code.people, n = 5)
 
 # Run test
-code.recognition = test(code = code.people, kappaThreshold = 0.65)
+code.recognition <- test(code = code.people, kappaThreshold = 0.65)
 
 summary(code.recognition)
 
 # Create the People code
-code.people = create.code(name = "Competence", expressions = c("works", "programmed", "broke", "fixed", "wondering"), excerpts = rs$text)
+code.people <- create.code(name = "Competence", expressions = c("works", "programmed", "broke", "fixed", "wondering"), excerpts = rs$text)
 
 # Handcode 30 excerpts for People code
-code.people = handcode(code = code.people, n=5)
+code.people <- handcode(code = code.people, n = 5)
 
 # Run test
-code.people = test(code = code.people, kappaThreshold = 0.65)
+code.people <- test(code = code.people, kappaThreshold = 0.65)
 
 summary(code.people)
 
@@ -144,16 +204,16 @@ summary(code.people)
 ###
 # Generate a CodeSet for all Codes
 ###
-code.set = code.set("Demo RS CodeSet", "CodeSet made for the demo", codes = c(code.data, code.people))
+code.set <- code.set("Demo RS CodeSet", "CodeSet made for the demo", codes = c(code.data, code.people))
 
 # Autocode the full set of excerpts, returning a data.frame
-allcoded = autocode(x = code.set)
+allcoded <- autocode(x = code.set)
 
 # Autocode, returning the Code.Set with codes containing updated $computerSets
-allcoded = autocode(x = code.set, simplify = F)
+allcoded <- autocode(x = code.set, simplify = F)
 
 # Convert the CodeSet directly to a data.frame using each Codes $computerSet
-allcoded.data = as.data.frame(allcoded)
+allcoded.data <- as.data.frame(allcoded)
 ```
 
 
@@ -164,4 +224,3 @@ allcoded.data = as.data.frame(allcoded)
 ```{r}
 spark_disconnect(sc)
 ```
-
