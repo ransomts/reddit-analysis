@@ -33,8 +33,8 @@ sc <- spark_connect(master = spark_master_info, config = config)
 
 
 ```{r read in posts}
-read_programmer_posts <- function(sc) {
-  for (sub in list.files("/scratch1/tsranso/reddit/subreddit-posts", full.names = TRUE)) {
+read_posts_that_contain <- function(sc, pattern) {
+    for (sub in list.files("/scratch1/tsranso/reddit/subreddit-posts", full.names = TRUE)) {
     for (input_directory in list.files(sub, full.names = TRUE)) {
       sr <- basename(dirname(input_directory))
       #input_directory <- "/scratch1/tsranso/reddit/subreddit-posts/learnprogramming/2014"
@@ -56,6 +56,10 @@ read_programmer_posts <- function(sc) {
     programmer_posts <- bind_rows(programmer_posts, new_posts)
   }
   write_rds(programmer_posts, "data/programmer-posts.rds")
+}
+
+read_programmer_posts <- function(sc) {
+  read_posts_that_contain(sc, "programmer")
 }
 
 if (!file.exists("data/programmer-posts.rds")) {
