@@ -451,6 +451,13 @@
       "Repository": "CRAN",
       "Hash": "15e9634c0fcd294799e9b2e929ed1b86"
     },
+    "ggiraph": {
+      "Package": "ggiraph",
+      "Version": "0.8.6",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "8b505f525831a54fa0149f457048f7a0"
+    },
     "ggplot2": {
       "Package": "ggplot2",
       "Version": "3.4.1",
@@ -595,6 +602,19 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "0080607b4a1a7b28979aecef976d8bc2"
+    },
+    "job": {
+      "Package": "job",
+      "Version": "0.3.0",
+      "Source": "CRAN",
+      "Repository": "CRAN",
+      "RemoteType": "standard",
+      "RemotePkgRef": "job",
+      "RemoteRef": "job",
+      "RemoteRepos": "https://cran.rstudio.com",
+      "RemotePkgPlatform": "source",
+      "RemoteSha": "0.3.0",
+      "Hash": "3c762f5650c9f3f79336937e4cfb5e43"
     },
     "jquerylib": {
       "Package": "jquerylib",

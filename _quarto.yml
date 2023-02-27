@@ -9,10 +9,10 @@ book:
   page-navigation: true
   chapters:
     - index.qmd
-    - source-data.qmd
-    - sentiment-analysis.qmd
-    - topic-modeling.qmd
-    - quant-ethnography.qmd
+    - 10-source-data.qmd
+    - 20-sentiment-analysis.qmd
+    - 30-topic-modeling.qmd
+    - 40-quant-ethnography.qmd
 
 bibliography: references.bib
 

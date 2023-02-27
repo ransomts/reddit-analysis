@@ -7,6 +7,9 @@ library(sparklyr)
 library(tidyverse)
 library(magrittr)
 library(jsonlite)
+library(ggiraph)
+library(ncodeR)
+library(rhoR)
 ```
 
 ## Load Reddit Post Data

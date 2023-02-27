@@ -11,3 +11,6 @@
 /metastore_db/
 /_freeze/
 derby.log
+/data/*.rds
+/*.html
+/*.rmarkdown
