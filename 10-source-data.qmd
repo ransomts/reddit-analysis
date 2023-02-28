@@ -2,8 +2,8 @@
 
 ```{r setup, include=FALSE, cache=FALSE}
 knitr::opts_chunk$set(echo = TRUE, tidy = TRUE, eval = FALSE, cache.path = "cache/")
-knitr::read_chunk('globals.R')
-#source('globals.R')
+knitr::read_chunk("globals.R")
+# source('globals.R')
 library(kableExtra)
 library(tidyverse)
 library(formatR)
@@ -34,8 +34,8 @@ I'm using the Palmetto cluster to make quick work of processing through our Redd
 ### Set up and connect to spark
 
 ```{r spark setup, eval=FALSE}
-Sys.setenv(SPARK_HOME="/software/external/spark/3.3.1")
-Sys.setenv(JAVA_HOME="/software/spackages/linux-rocky8-x86_64/gcc-9.5.0/openjdk-11.0.15_10-xo4fjahmlsjch52sftpoxby6kwbdfoib")
+Sys.setenv(SPARK_HOME = "/software/external/spark/3.3.1")
+Sys.setenv(JAVA_HOME = "/software/spackages/linux-rocky8-x86_64/gcc-9.5.0/openjdk-11.0.15_10-xo4fjahmlsjch52sftpoxby6kwbdfoib")
 library(sparklyr)
 
 options(sparklyr.log.console = TRUE)
@@ -43,9 +43,9 @@ config <- spark_config()
 config["sparklyr.shell.driver-memory"] <- "10g"
 config["spark.executor.memory"] <- "15G" # typically 4g
 
-spark_master_info <- Sys.getenv("RSESSION_LOG_FILE") %>% 
-  dirname %>% 
-  paste0("/spark_master.info") %>% 
+spark_master_info <- Sys.getenv("RSESSION_LOG_FILE") %>%
+  dirname() %>%
+  paste0("/spark_master.info") %>%
   readLines(n = 1)
 
 # master node needs to be modified with each new job
@@ -58,7 +58,7 @@ We need a few functions to read through the Reddit data, for example here's some
 
 ```{r pull posts function def}
 pull_posts_of_subreddit <- function(sc = NULL,
-                                    years = c(2014, 2015, 2016, 2017), 
+                                    years = c(2014, 2015, 2016, 2017),
                                     sr = "Python",
                                     write_to_dir = FALSE) {
   message("Pulling posts for subreddit: ", sr)
@@ -70,9 +70,8 @@ pull_posts_of_subreddit <- function(sc = NULL,
     year_dir <- paste0("/scratch1/tsranso/reddit/posts/", year)
     message("Checking for cached posts...")
     if (!file.exists(paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year, "/_SUCCESS"))) {
-      
       message("Reading from directory: ", year_dir)
-      
+
       if (file.exists(year_dir)) {
         message("Directory does exists: ", file.exists(year_dir))
         posts <- spark_read_json(sc, path = year_dir, memory = FALSE) %>%
@@ -80,19 +79,17 @@ pull_posts_of_subreddit <- function(sc = NULL,
       } else {
         message("Directory does not exist: ", year_dir)
       }
-      
+
       if (write_to_dir) {
         output_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year)
         message("Writing filtered post data to: ", output_directory)
         spark_write_json(posts, path = output_directory, mode = "overwrite")
       }
-      
+
       return(posts)
-      
     } else {
       message("Previous filtered data found at: ", paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year, "/_SUCCESS"))
     }
-    
   }
   # this is probably bad form
   return(NULL)
@@ -107,24 +104,24 @@ pull_posts_of_subreddit(sc, write_to_dir = TRUE)
 And another one to get all the comments from a subreddit:
 
 ```{r pull comments function def}
-pull_comments_of_subreddit <- function(years = c(2014, 2014, 2016, 2017), 
+pull_comments_of_subreddit <- function(years = c(2014, 2014, 2016, 2017),
                                        sr = "python",
                                        write_to_dir = FALSE) {
   for (year in years) {
     year_dir <- paste0("/scratch1/tsranso/reddit/comments/", year)
     comments <- spark_read_json(sc, path = year_dir, memory = FALSE) %>%
       filter(subreddit %in% c(sr) & selftext != "") %>%
-      mutate(selftext = regexp_replace(selftext, "\\n|&nbsp;|<[^>]*>|[^A-Za-z|']", " ")) %>% 
-      mutate(selftext = str_trim(selftext)) %>% 
+      mutate(selftext = regexp_replace(selftext, "\\n|&nbsp;|<[^>]*>|[^A-Za-z|']", " ")) %>%
+      mutate(selftext = str_trim(selftext)) %>%
       filter(!selftext %in% c("", "deleted", "title", "removed"))
-    
+
     if (write_to_dir) {
       output_directory <- paste0("/scratch1/tsranso/reddit/subreddit-comments/", sr, "/", year)
       message("Writing filtered comment data to: ", output_directory)
       spark_write_json(comments, path = output_directory, mode = "overwrite")
     }
   }
-  
+
   return(posts)
 }
 ```
@@ -136,10 +133,10 @@ There are lots of great (and many not so great) communities on Reddit. Here is t
 ```{r, cache=FALSE, eval=TRUE}
 <<subs-of-interest>>
 # knitr::kable(subs_of_interest, caption = "Subreddits of interest")
-subs_of_interest %>% 
+subs_of_interest %>%
   kable() %>%
-  kable_styling("striped") %>% 
- scroll_box(height = "200px")
+  kable_styling("striped") %>%
+  scroll_box(height = "200px")
 ```
 
 ::: {.panel-tabset}
@@ -181,7 +178,9 @@ year <- 2017
 ```{r}
 input_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year)
 posts <- spark_read_json(sc, path = input_directory, memory = FALSE)
-posts %>% head %>% print
+posts %>%
+  head() %>%
+  print()
 ```
 
 ## Comment Data
@@ -189,7 +188,9 @@ posts %>% head %>% print
 ```{r}
 input_directory <- paste0("/scratch1/tsranso/reddit/subreddit-comments/", sr, "/", year)
 comments <- spark_read_json(sc, path = input_directory, memory = FALSE)
-comments %>% head %>% print
+comments %>%
+  head() %>%
+  print()
 ```
 
 # Close spark connection

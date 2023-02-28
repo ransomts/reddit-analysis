@@ -2,7 +2,7 @@
 
 ```{r setup, include=FALSE, cache=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::read_chunk('globals.R')
+knitr::read_chunk("globals.R")
 library(tidyverse)
 library(magrittr)
 ```
@@ -12,22 +12,22 @@ library(magrittr)
 ## Conducting the analysis
 
 ```{r sentiment analysis function}
-conduct_sentiment_analysis <- function(sr = "Python", year = 2014){
+conduct_sentiment_analysis <- function(sr = "Python", year = 2014) {
   input_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year)
-  
+
   message("Opening input directory: ", input_directory)
   posts <- spark_read_json(sc, path = input_directory, memory = FALSE)
   message("Running analysis...")
-  # sentiments <- posts %>% 
-  #   collect() %>% 
+  # sentiments <- posts %>%
+  #   collect() %>%
   #   dplyr::mutate(dialogue_split = sentimentr::get_sentences(selftext), sub = sr) %$%
   #   sentiment_by(dialogue_split, sub)
-  
-sentiments <- posts %>% 
-    collect() %>% 
+
+  sentiments <- posts %>%
+    collect() %>%
     sentimentr::get_sentences() %$%
     sentiment_by(selftext)
-  
+
   message("Computed sentiments for subreddit: ", sr, " during ", year)
   return(sentiments)
 }
@@ -36,14 +36,14 @@ sentiments <- posts %>%
 ## Plotting the results
 ```{r sentiment plotting function}
 plot_sentiments <- function(sentiments, sr = "Python", year = 2014) {
-  plot <- ggplot(sentiments, aes(ave_sentiment, sr)) + 
+  plot <- ggplot(sentiments, aes(ave_sentiment, sr)) +
     geom_boxplot()
   ggsave(filename = paste0("sentiments-", sr, "-", year, ".png"), plot, path = "plots/")
 }
-#sr <- "Python"
-#year <- 2014
-#python_2014_sentiments <- conduct_sentiment_analysis()
-#plot_sentiments(python_2014_sentiments)
+# sr <- "Python"
+# year <- 2014
+# python_2014_sentiments <- conduct_sentiment_analysis()
+# plot_sentiments(python_2014_sentiments)
 ```
 
 :::
@@ -57,16 +57,24 @@ plot_sentiments <- function(sentiments, sr = "Python", year = 2014) {
 for (sub in subs_of_interest) {
   for (y in years) {
     if (!file.exists(paste0("data/sentiments-", sub, "-", y, ".rds"))) {
-      tryCatch({
-        withTimeout({
-          sentiments <- conduct_sentiment_analysis(sr = sub, year = y)
-          plot_sentiments(sentiments, sr = sub, year = y)
-          write_rds(sentiments, file = paste0("data/sentiments-", sub, "-", y, ".rds"))
-        }, timeout = 600)
-      }, TimeoutException = function(ex) {
-        message("Processing ", sub, " ", y, " timed out :(")
-      })
-    } else { message("Already processed ", sub, " ", y)}
+      tryCatch(
+        {
+          withTimeout(
+            {
+              sentiments <- conduct_sentiment_analysis(sr = sub, year = y)
+              plot_sentiments(sentiments, sr = sub, year = y)
+              write_rds(sentiments, file = paste0("data/sentiments-", sub, "-", y, ".rds"))
+            },
+            timeout = 600
+          )
+        },
+        TimeoutException = function(ex) {
+          message("Processing ", sub, " ", y, " timed out :(")
+        }
+      )
+    } else {
+      message("Already processed ", sub, " ", y)
+    }
   }
 }
 ```
@@ -85,10 +93,14 @@ Interpretation of these statistical tests needs some special attention here. Bec
 library(ggpubr)
 
 for (year in 2014:2017) {
-  assign(paste0("sentiments-python-", year), 
-         readRDS(paste0("data/sentiments-Python-", year, ".rds")))
-  assign(paste0("sentiments-learnpython-", year), 
-         readRDS(paste0("data/sentiments-learnpython-", year, ".rds")))
+  assign(
+    paste0("sentiments-python-", year),
+    readRDS(paste0("data/sentiments-Python-", year, ".rds"))
+  )
+  assign(
+    paste0("sentiments-learnpython-", year),
+    readRDS(paste0("data/sentiments-learnpython-", year, ".rds"))
+  )
 }
 
 `sentiments-learnpython-2014` %<>% select(ave_sentiment) %>% mutate(year = 2014)
@@ -101,25 +113,33 @@ for (year in 2014:2017) {
 `sentiments-python-2016` %<>% select(ave_sentiment) %>% mutate(year = 2016)
 `sentiments-python-2017` %<>% select(ave_sentiment) %>% mutate(year = 2017)
 
-p_sentiments <- rbind(`sentiments-python-2014`, 
-      `sentiments-python-2015`, 
-      `sentiments-python-2016`, 
-      `sentiments-python-2017`) 
+p_sentiments <- rbind(
+  `sentiments-python-2014`,
+  `sentiments-python-2015`,
+  `sentiments-python-2016`,
+  `sentiments-python-2017`
+)
 p_sentiments %>% ggboxplot(x = "year", y = "ave_sentiment")
 p_sentiments %>% ggviolin(x = "year", y = "ave_sentiment")
 
-p_sentiments %>% group_by(year) %>% summarise(avg = mean(ave_sentiment))
+p_sentiments %>%
+  group_by(year) %>%
+  summarise(avg = mean(ave_sentiment))
 one.way <- aov(year ~ ave_sentiment, data = p_sentiments)
 summary(one.way)
 
-lp_sentiments <- rbind(`sentiments-learnpython-2014`, 
-      `sentiments-learnpython-2015`, 
-      `sentiments-learnpython-2016`, 
-      `sentiments-learnpython-2017`) 
+lp_sentiments <- rbind(
+  `sentiments-learnpython-2014`,
+  `sentiments-learnpython-2015`,
+  `sentiments-learnpython-2016`,
+  `sentiments-learnpython-2017`
+)
 lp_sentiments %>% ggboxplot(x = "year", y = "ave_sentiment")
 lp_sentiments %>% ggviolin(x = "year", y = "ave_sentiment")
 
-lp_sentiments %>% group_by(year) %>% summarise(avg = mean(ave_sentiment))
+lp_sentiments %>%
+  group_by(year) %>%
+  summarise(avg = mean(ave_sentiment))
 one.way <- aov(year ~ ave_sentiment, data = lp_sentiments)
 summary(one.way)
 ```
