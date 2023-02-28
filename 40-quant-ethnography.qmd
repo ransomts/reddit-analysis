@@ -73,7 +73,9 @@ if (!file.exists("data/programmer-posts.rds")) {
 programmer_posts <- readRDS("data/programmer-posts.rds")
 
 programmer_posts %<>%
-  mutate(selftext = str_squish(str_remove_all(str_replace_all(selftext, "\n", " "), "[^[:alnum:] \n]")))
+  mutate(selftext = str_squish(str_remove_all(str_replace_all(selftext, "\n", " "), "[^[:alnum:] \n.]")))
+
+programmer_posts %<>% unnest_sentences(text_sentences, selftext)
 ```
 
 ## A few descriptive stats about our data
@@ -112,7 +114,8 @@ programmer_lda <- programmer_posts %>%
     remove_numbers = TRUE,
     remove_url = TRUE
   ) %>%
-  tokens_remove(c(quanteda::stopwords("english"), quanteda::stopwords(source = "smart"))) %>%
+  tokens_remove(c(quanteda::stopwords("english"), 
+                  quanteda::stopwords(source = "smart"))) %>%
   tokens_wordstem() %>%
   dfm() %>%
   stm(K = 3, init.type = "LDA", verbose = FALSE)
@@ -148,7 +151,7 @@ programmer_top_terms %>%
 
 For segmenting I'm going to be using a post by post frame, and formatting is the removal 
 ```{r, eval=FALSE}
-programmer_posts %<>% select(selftext)
+programmer_post_text <- programmer_posts %>% select(selftext)
 # programmer_posts %>% mutate(selftext = )
 ```
 
