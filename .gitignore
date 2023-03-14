@@ -12,5 +12,6 @@
 /_freeze/
 derby.log
 /data/*.rds
+/data/*.json
 /*.html
 /*.rmarkdown

@@ -2,7 +2,7 @@
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::read_chunk('globals.R')
+knitr::read_chunk("globals.R")
 ```
 
 ::: {.panel-tabset}
@@ -10,11 +10,15 @@ knitr::read_chunk('globals.R')
 ## Conduct topic modeling
 ```{r}
 conduct_lda <- function(sr = "Python", year = 2014) {
+<<<<<<< HEAD
 
+=======
+>>>>>>> 034523c222d33cff1f7651d26a170c9d2eaaf1f7
   input_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year)
 
   message("Opening input directory: ", input_directory)
   posts <- spark_read_json(sc, path = input_directory, memory = FALSE)
+<<<<<<< HEAD
   message("Running LDAs for ", year, " ", sr)
   lda_betas <- NULL
 
@@ -46,25 +50,48 @@ conduct_lda <- function(sr = "Python", year = 2014) {
   }
 
   message("Computed LDAs")
+=======
+  message("Running LDA...")
+  lda_betas <- posts %>%
+    ml_lda(~selftext,
+      k = 6,
+      max_iter = 1,
+      min_token_length = 4,
+      stop_words = sparklyr::ml_default_stop_words(sc),
+      min_df = 5
+    ) %>%
+    tidy()
+  message("Computed LDA")
+>>>>>>> 034523c222d33cff1f7651d26a170c9d2eaaf1f7
   return(lda_betas)
 }
 ```
 
 ## Plot Topics
 ```{r}
+<<<<<<< HEAD
 plot_betas <- function(lda_filename = fn) {
   if (!file.exists(lda_filename)) { message("LDA data file not found at: ", lda_filename)}
   #if (is.null(betas) || nrow(betas) == 0) { return() }
   lda_betas <- read_rds(lda_filename)
 
   plot <- lda_betas %>% group_by(topic) %>%
+=======
+plot_betas <- function(betas, sr = "Python", year = "2014") {
+  if (nrow(lda_betas) == 0) {
+    return()
+  }
+
+  plot <- betas %>%
+    group_by(topic) %>%
+>>>>>>> 034523c222d33cff1f7651d26a170c9d2eaaf1f7
     top_n(15, beta) %>%
     ungroup() %>%
     arrange(topic, -beta) %>%
     mutate(term = reorder(term, beta)) %>%
     ggplot(aes(term, beta, fill = factor(topic))) +
     geom_col(show.legend = FALSE) +
-    facet_wrap(~ topic, scales = "free") +
+    facet_wrap(~topic, scales = "free") +
     coord_flip()
 
   plot_filename <- str_replace(lda_filename, "data", "plots") %>%
@@ -89,8 +116,18 @@ registerDoParallel(cores=20)
 
 for (sub in xdber_subs) {
   for (y in years) {
+<<<<<<< HEAD
     message("Conducting LDA for ", sub, " in ", y)
     lda_betas <- conduct_lda(sr = sub, year = y)
+=======
+    if (!file.exists(paste0("data/lda-", sub, "-", y, ".rds"))) {
+      lda_betas <- conduct_lda(sr = sub, year = y)
+      plot_betas(betas = lda_betas, sr = sub, year = y)
+      write_rds(lda_betas, file = paste0("data/lda-", sub, "-", y, ".rds"))
+    } else {
+      message("Already processed ", sub, " ", y)
+    }
+>>>>>>> 034523c222d33cff1f7651d26a170c9d2eaaf1f7
   }
 }
 
