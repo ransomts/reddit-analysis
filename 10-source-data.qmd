@@ -86,13 +86,9 @@ pull_posts_of_subreddit <- function(sc = NULL,
         message("Writing filtered post data to: ", output_directory)
         spark_write_json(posts, path = output_directory, mode = "overwrite")
       }
-      
-      return(posts)
-      
     } else {
       message("Previous filtered data found at: ", paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year, "/_SUCCESS"))
     }
-    
   }
   # this is probably bad form
   return(NULL)

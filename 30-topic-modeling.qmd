@@ -10,30 +10,54 @@ knitr::read_chunk('globals.R')
 ## Conduct topic modeling
 ```{r}
 conduct_lda <- function(sr = "Python", year = 2014) {
-  
+
   input_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year)
 
   message("Opening input directory: ", input_directory)
   posts <- spark_read_json(sc, path = input_directory, memory = FALSE)
-  message("Running LDA...")
-  lda_betas <- posts %>% ml_lda(~ selftext, 
-                      k = 6, 
-                      max_iter = 1, 
-                      min_token_length = 4,
-                      stop_words = sparklyr::ml_default_stop_words(sc), 
-                      min_df = 5) %>%
-    tidy()
-  message("Computed LDA")
+  message("Running LDAs for ", year, " ", sr)
+  lda_betas <- NULL
+
+  for (num_topics in 2:8) {
+    if (!file.exists(paste0("data/lda-", sub, "-", year, "-", num_topics, ".rds"))) {
+      message("\tnumber of topics: ", num_topics)
+
+      # tokenizing and removing stop words
+      lda_betas <- posts %>%
+        select(id, selftext) %>%
+        filter(length(selftext) > 0) %>%
+        mutate(selftext = regexp_replace(selftext, "[_\"\'():;,.!?-]", " ")) %>%
+        ft_tokenizer(input_col = "selftext", output_col = "word_list") %>%
+        ft_stop_words_remover(
+          input_col = "word_list",
+          output_col = "wo_stop_words" ) %>%
+        mutate(selftext = explode(wo_stop_words)) %>% filter(selftext != "") %>%
+        ml_lda(~ selftext,
+               k = num_topics,
+               max_iter = 20,
+               min_token_length = 4,
+               stop_words = sparklyr::ml_default_stop_words(sc),
+               min_df = 5) %>%
+        tidy()
+      write_rds(lda_betas, file = paste0("data/lda-", sr, "-", year, "-", num_topics, ".rds"))
+    } else {
+      message("LDA already computed for ", sub, "-", year, "-", num_topics)
+    }
+  }
+
+  message("Computed LDAs")
   return(lda_betas)
 }
 ```
 
 ## Plot Topics
 ```{r}
-plot_betas <- function(betas, sr = "Python", year = "2014") {
-  if (nrow(lda_betas) == 0) { return() }
-  
-  plot <- betas %>% group_by(topic) %>%
+plot_betas <- function(lda_filename = fn) {
+  if (!file.exists(lda_filename)) { message("LDA data file not found at: ", lda_filename)}
+  #if (is.null(betas) || nrow(betas) == 0) { return() }
+  lda_betas <- read_rds(lda_filename)
+
+  plot <- lda_betas %>% group_by(topic) %>%
     top_n(15, beta) %>%
     ungroup() %>%
     arrange(topic, -beta) %>%
@@ -42,7 +66,11 @@ plot_betas <- function(betas, sr = "Python", year = "2014") {
     geom_col(show.legend = FALSE) +
     facet_wrap(~ topic, scales = "free") +
     coord_flip()
-  ggsave(filename = paste0(sr, "-", year, ".png"), plot, path = "plots/")
+
+  plot_filename <- str_replace(lda_filename, "data", "plots") %>%
+    str_replace("rds", "png")
+  message("Saving plot to: ", plot_filename)
+  ggsave(filename = plot_filename, plot)
 }
 ```
 
@@ -54,14 +82,21 @@ plot_betas <- function(betas, sr = "Python", year = "2014") {
 <<subs-of-interest>>
 <<years-of-interest>>
 
-for (sub in subs_of_interest) {
+library(foreach)
+library(doParallel)
+registerDoParallel(cores=20)
+
+
+for (sub in xdber_subs) {
   for (y in years) {
-    if (!file.exists(paste0("data/lda-", sub, "-", y, ".rds"))) {
-      lda_betas <- conduct_lda(sr = sub, year = y)
-      plot_betas(betas = lda_betas, sr = sub, year = y)
-      write_rds(lda_betas, file = paste0("data/lda-", sub, "-", y, ".rds"))
-    } else { message("Already processed ", sub, " ", y)}
+    message("Conducting LDA for ", sub, " in ", y)
+    lda_betas <- conduct_lda(sr = sub, year = y)
   }
+}
+
+
+foreach(file=iter(list.files(path = "data", pattern = "lda-*", full.names = TRUE))) %dopar% {
+  plot_betas(file)
 }
 ```
 

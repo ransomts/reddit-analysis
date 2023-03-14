@@ -84,7 +84,7 @@ programmer_posts %>% group_by(domain) %>% summarize(count = n()) %>% arrange(-co
 ## A quick LDA
 
 ```{r}
-#library(topicmodels)
+library(topicmodels)
 ```
 
 
