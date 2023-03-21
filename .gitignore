@@ -15,3 +15,5 @@ derby.log
 /data/*.json
 /*.html
 /*.rmarkdown
+/site_libs/
+/stm/

@@ -1,0 +1,72 @@
+# Burnout
+
+The subreddit r/sysadmin has a section on the FAQ for professional burnout.
+
+Lots of posts from professional technologists about being burned out and the rants as to why.
+
+Can NLP pluck out the most common causes of burnout from these rants?
+
+From Shannon Stefl's dissertation: 
+> A psychological construct often examined in faculty well-being research is burnout, which has been extensively studied for decades with much work centered around the faculty profession (Goodman & Schorling, 2012; Kavanagh & Spiro, 2018; Luken & Sammons, 2016; Sabagh, Hall, & Saroyan, 2018; Shanafelt et al., 2009; Singh, Mishra, & Kim, 1998; Skaalvik & Skaalvik, 2007). For example, Sabagh et al. (2018, p. 132) explain that “burnout is a state of physical, emotional and mental exhaustion resulting from a prolonged response to long-term exposure to demanding situations,” and that modern faculty experience high levels of this burnout. In their review of literature on faculty burnout, these scholars reveal that over the last few decades faculty performance and productivity expectations have steadily risen and have resulted in increased psychological challenges that threatened faculty well-being. They reported that increased workload demands and conflict between roles contributed to psychological distress and feelings of burnout, and that burnout was consistently and negatively correlated with job satisfaction as well as psychological and physical well-being (Sabagh et al., 2018).
+
+Luken, M., & Sammons, A. (2016). Systematic review of mindfulness practice for
+reducing job burnout. American Journal of Occupational Therapy, 70(2),
+7002250020p1-7002250020p10.
+
+# Getting data
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, tidy = TRUE, eval = FALSE, cache.path = "cache/")
+knitr::read_chunk("globals.R")
+# source('globals.R')
+library(kableExtra)
+library(tidyverse)
+library(formatR)
+set.seed(13) # lets get rid of some randomization with the luckiest number
+
+```
+
+## Setting up spark
+
+```{r spark setup, eval=FALSE}
+Sys.setenv(SPARK_HOME = "/software/external/spark/3.3.1")
+Sys.setenv(JAVA_HOME = "/software/spackages/linux-rocky8-x86_64/gcc-9.5.0/openjdk-11.0.15_10-xo4fjahmlsjch52sftpoxby6kwbdfoib")
+library(sparklyr)
+
+options(sparklyr.log.console = TRUE)
+config <- spark_config()
+config["sparklyr.shell.driver-memory"] <- "10g"
+config["spark.executor.memory"] <- "15G" # typically 4g
+
+spark_master_info <- Sys.getenv("RSESSION_LOG_FILE") %>%
+  dirname() %>%
+  paste0("/spark_master.info") %>%
+  readLines(n = 1)
+
+# master node needs to be modified with each new job
+sc <- spark_connect(master = spark_master_info, config = config)
+```
+
+```{r pull comments function def}
+pull_comments_of_subreddit <- function(years = c(2014, 2014, 2016, 2017),
+                                       sr = "python",
+                                       write_to_dir = FALSE) {
+  for (year in years) {
+    year_dir <- paste0("/scratch1/tsranso/reddit/comments/", year)
+    comments <- spark_read_json(sc, path = year_dir, memory = FALSE) %>%
+      filter(subreddit %in% c(sr) & selftext != "") %>%
+      mutate(selftext = regexp_replace(selftext, "\\n|&nbsp;|<[^>]*>|[^A-Za-z|']", " ")) %>%
+      mutate(selftext = str_trim(selftext)) %>%
+      filter(!selftext %in% c("", "deleted", "title", "removed"))
+
+    if (write_to_dir) {
+      output_directory <- paste0("/scratch1/tsranso/reddit/subreddit-comments/", sr, "/", year)
+      message("Writing filtered comment data to: ", output_directory)
+      spark_write_json(comments, path = output_directory, mode = "overwrite")
+    }
+  }
+
+  return(posts)
+}
+```
+
