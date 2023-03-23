@@ -10,8 +10,18 @@ knitr::read_chunk("globals.R")
 ## Conduct topic modeling
 ```{r}
 conduct_lda <- function(sr = "Python", year = 2014) {
-  input_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year)
+  if (file.exists(paste0("data/lda-", sr, "-", year, "-", 8, ".rds"))) {
+    message("Max topic LDA already computed: ", paste0("data/lda-", sr, "-", year, "-", 8, ".rds"))
+    return(NULL)
+  }
+  
+  input_directory <- paste0("/fastscratch/tsranso/reddit/subreddit-posts/", sr, "/", year)
 
+  if (!file.exists(input_directory)) {
+    message("Subreddit directory does not exist at: ", input_directory)
+    return(NULL)
+  }
+  
   message("Opening input directory: ", input_directory)
   posts <- spark_read_json(sc, path = input_directory, memory = FALSE)
 
@@ -25,7 +35,7 @@ conduct_lda <- function(sr = "Python", year = 2014) {
       # tokenizing and removing stop words
       lda_betas <- posts %>%
         select(id, selftext) %>%
-        filter(length(selftext) > 0) %>%
+        filter(length(selftext) > 0 && selftext != '[removed]' && selftext != "[deleted]") %>% 
         mutate(selftext = regexp_replace(selftext, "[_\"\'():;,.!?-]", " ")) %>%
         ft_tokenizer(input_col = "selftext", output_col = "word_list") %>%
         ft_stop_words_remover(

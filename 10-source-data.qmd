@@ -67,9 +67,9 @@ pull_posts_of_subreddit <- function(sc = NULL,
     return(NULL)
   }
   for (year in years) {
-    year_dir <- paste0("/scratch1/tsranso/reddit/posts/", year)
+    year_dir <- paste0("/fastscratch/tsranso/reddit/posts/", year)
     message("Checking for cached posts...")
-    if (!file.exists(paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year, "/_SUCCESS"))) {
+    if (!file.exists(paste0("/fastscratch/tsranso/reddit/subreddit-posts/", sr, "/", year, "/_SUCCESS"))) {
       message("Reading from directory: ", year_dir)
 
       if (file.exists(year_dir)) {
@@ -81,12 +81,12 @@ pull_posts_of_subreddit <- function(sc = NULL,
       }
 
       if (write_to_dir) {
-        output_directory <- paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year)
+        output_directory <- paste0("/fastscratch/tsranso/reddit/subreddit-posts/", sr, "/", year)
         message("Writing filtered post data to: ", output_directory)
         spark_write_json(posts, path = output_directory, mode = "overwrite")
       }
     } else {
-      message("Previous filtered data found at: ", paste0("/scratch1/tsranso/reddit/subreddit-posts/", sr, "/", year, "/_SUCCESS"))
+      message("Previous filtered data found at: ", paste0("/fastscratch/tsranso/reddit/subreddit-posts/", sr, "/", year, "/_SUCCESS"))
     }
   }
   # this is probably bad form
@@ -146,7 +146,7 @@ Let's loop through the subreddits of interest and pull out the text posts! Note 
 ```{r pull posts}
 #| code-fold: show
 #| eval: false
-for (sub in subs_of_interest) {
+for (sub in xdber_subs) {
   pull_posts_of_subreddit(sc, sr = sub, write_to_dir = TRUE)
 }
 ```
