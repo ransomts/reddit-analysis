@@ -166,7 +166,7 @@ library(ncodeR)
 data(RS.data)
 rs <- RS.data
 
-code.experience <- create.code(name = "Experiences", expressions = c("go to work", excerpts = rs$text))
+code.experience <- create.code(name = "Experiences", expressions = c("go to work"), excerpts = rs$text))
 
 ###
 # Create the Data code

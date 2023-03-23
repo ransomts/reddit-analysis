@@ -6,7 +6,7 @@ Lots of posts from professional technologists about being burned out and the ran
 
 Can NLP pluck out the most common causes of burnout from these rants?
 
-From Shannon Stefl's dissertation: 
+From Shannon Stefl's dissertation:
 > A psychological construct often examined in faculty well-being research is burnout, which has been extensively studied for decades with much work centered around the faculty profession (Goodman & Schorling, 2012; Kavanagh & Spiro, 2018; Luken & Sammons, 2016; Sabagh, Hall, & Saroyan, 2018; Shanafelt et al., 2009; Singh, Mishra, & Kim, 1998; Skaalvik & Skaalvik, 2007). For example, Sabagh et al. (2018, p. 132) explain that “burnout is a state of physical, emotional and mental exhaustion resulting from a prolonged response to long-term exposure to demanding situations,” and that modern faculty experience high levels of this burnout. In their review of literature on faculty burnout, these scholars reveal that over the last few decades faculty performance and productivity expectations have steadily risen and have resulted in increased psychological challenges that threatened faculty well-being. They reported that increased workload demands and conflict between roles contributed to psychological distress and feelings of burnout, and that burnout was consistently and negatively correlated with job satisfaction as well as psychological and physical well-being (Sabagh et al., 2018).
 
 Luken, M., & Sammons, A. (2016). Systematic review of mindfulness practice for
@@ -14,6 +14,22 @@ reducing job burnout. American Journal of Occupational Therapy, 70(2),
 7002250020p1-7002250020p10.
 
 # Getting data
+
+## python pmas
+
+```{python}
+from pmaw import PushshiftAPI
+api = PushshiftAPI()
+posts = api.search_submissions(subreddit="sysadmin", limit=100, q="burn")
+post_list = [post for post in posts]
+
+import jsonlines
+with jsonlines.open('data/burnout_posts.json', mode='w') as writer:
+  writer.write(post_list)
+```
+
+
+## sparklyr
 
 ```{r}
 knitr::opts_chunk$set(echo = TRUE, tidy = TRUE, eval = FALSE, cache.path = "cache/")
@@ -26,7 +42,7 @@ set.seed(13) # lets get rid of some randomization with the luckiest number
 
 ```
 
-## Setting up spark
+### Setting up spark
 
 ```{r spark setup, eval=FALSE}
 Sys.setenv(SPARK_HOME = "/software/external/spark/3.3.1")
@@ -70,3 +86,75 @@ pull_comments_of_subreddit <- function(years = c(2014, 2014, 2016, 2017),
 }
 ```
 
+
+
+# Basic data stats
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(tidyjson)
+library(pushshiftR)
+library(tidytext)
+
+burn_posts <- pushshiftR::getPushshiftData(postType = "submission",
+                 size = 100,
+                 q = "burnout",
+                 subreddit = "sysadmin",
+                 nest_level = 1)
+sbp <- burn_posts
+burn_posts <- sbp
+
+burn_posts %<>% select(author, title, selftext, score, created_utc) %>%
+  mutate(date = as_datetime(created_utc), created_utc = NULL) %>%
+  mutate(selftext = str_to_lower(str_remove_all(selftext, "[,:_]"))) %>%
+  separate_longer_delim(cols = selftext, delim = "\n\n") %>%
+  filter(selftext != "&amp;#x200b;" & selftext != "[deleted]" & selftext != "")
+```
+
+# Quantitative ethnography
+
+```{r}
+library(ncodeR)
+
+code.emotions.negative <- create.code(
+  name = "Negative Emotions",
+  definition = "Any bad/draining feelings",
+  expressions = c("depression", "anger", "sad", "fear", "hostile"),
+  excerpts = burn_posts$selftext)
+code.emotions.negative <- handcode(code = code.emotions.negative,
+                                  excerpts = burn_posts$selftext, n = 4, unseen = TRUE)
+code.emotions.negative <- test(code = code.emotions.negative, kappa_threshold = 0.65)
+
+
+
+code.emotions.positive <- create.code(
+  name = "Positive Emotions",
+  definition = "Any good/uplifting feelings",
+  expressions = c("happy", "proud", "trust", "optimistic"),
+  excerpts = burn_posts$selftext)
+
+code.duties <- create.code(
+  name = "Professional duties",
+  definition = "Anything related to professional expectations",
+  expressions = c("expected", "manage", "program", "on call", "work"),
+  excerpts = burn_posts$selftext)
+
+code.team <- create.code(
+  name = "Team members",
+  definition = "References to other individuals working with the individual",
+  expressions = c("manager", "team lead"),
+  excerpts = burn_posts$selftext)
+
+code.users <- create.code(
+  name = "Users",
+  definition = "References to individuals who are receiving tech support",
+  expressions = c("users"),
+  excerpts = burn_posts$selftext)
+
+code.company <- create.code(
+  name = "Company culture and policies",
+  definition = "Official policies or unofficial corporate culture",
+  excerpts = burn_posts$selftext)
+
+```
