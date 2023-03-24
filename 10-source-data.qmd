@@ -40,8 +40,8 @@ library(sparklyr)
 
 options(sparklyr.log.console = TRUE)
 config <- spark_config()
-config["sparklyr.shell.driver-memory"] <- "10g"
-config["spark.executor.memory"] <- "15G" # typically 4g
+config["sparklyr.shell.driver-memory"] <- "30g"
+config["spark.executor.memory"] <- "30G" # typically 4g
 
 spark_master_info <- Sys.getenv("RSESSION_LOG_FILE") %>%
   dirname() %>%

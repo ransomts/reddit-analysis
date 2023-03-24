@@ -105,12 +105,45 @@ burn_posts <- pushshiftR::getPushshiftData(postType = "submission",
 sbp <- burn_posts
 burn_posts <- sbp
 
-burn_posts %<>% select(author, title, selftext, score, created_utc) %>%
+burn_posts %<>% select(author, link_flair_text, title, selftext, score, created_utc) %>%
   mutate(date = as_datetime(created_utc), created_utc = NULL) %>%
   mutate(selftext = str_to_lower(str_remove_all(selftext, "[,:_]"))) %>%
   separate_longer_delim(cols = selftext, delim = "\n\n") %>%
   filter(selftext != "&amp;#x200b;" & selftext != "[deleted]" & selftext != "")
 ```
+
+# Topic modeling
+
+```{r}
+comments <- spark_read_json(sc, path = "/fastscratch/tsranso/reddit/subreddits/comments/sysadmin_comments", memory = FALSE)
+
+burnout_comments <- comments %>% select(author, score, body, id, parent_id, created) %>%
+  filter(body != "[deteled]" & body != "[removed]" & body != "") %>%
+  mutate(body = str_to_lower(body)) %>% filter(instr(body, "burnout") > 0)
+
+
+posts <- spark_read_json(sc, path = "/fastscratch/tsranso/reddit/subreddits/submissions/sysadmin_submissions", memory = FALSE)
+
+burnout_posts <- posts %>%
+  select(author, link_flair_text, title, selftext, score, created, view_count,
+         num_comments, num_crossposts, num_reports, id) %>%
+  filter(selftext != "[deleted]" & selftext != "[removed]" &
+           selftext != "") %>%
+  mutate(selftext = str_to_lower(selftext)) %>%
+  filter(instr(selftext, "burnout") > 0 |
+           instr(selftext, "burnt out") > 0 |
+           instr(selftext, "burning out") > 0 |
+           instr(selftext, "burn out") > 0)
+#View(collect(burnout_posts))
+
+rant_posts <- posts %>%
+  select(author, link_flair_text, title, selftext, score, created, view_count,
+         num_comments, num_crossposts, num_reports) %>%
+  filter(selftext != "[deleted]" & selftext != "[removed]" &
+           selftext != "" & link_flair_text == "Rant") %>%
+  mutate(selftext = str_to_lower(selftext))
+```
+
 
 # Quantitative ethnography
 
@@ -121,7 +154,7 @@ code.emotions.negative <- create.code(
   name = "Negative Emotions",
   definition = "Any bad/draining feelings",
   expressions = c("depression", "anger", "sad", "fear", "hostile"),
-  excerpts = burn_posts$selftext)
+  excerpts = burnout_posts$selftext)
 code.emotions.negative <- handcode(code = code.emotions.negative,
                                   excerpts = burn_posts$selftext, n = 4, unseen = TRUE)
 code.emotions.negative <- test(code = code.emotions.negative, kappa_threshold = 0.65)
@@ -132,29 +165,29 @@ code.emotions.positive <- create.code(
   name = "Positive Emotions",
   definition = "Any good/uplifting feelings",
   expressions = c("happy", "proud", "trust", "optimistic"),
-  excerpts = burn_posts$selftext)
+  excerpts = burnout_posts$selftext)
 
 code.duties <- create.code(
   name = "Professional duties",
   definition = "Anything related to professional expectations",
-  expressions = c("expected", "manage", "program", "on call", "work"),
-  excerpts = burn_posts$selftext)
+  expressions = c("expected", "manage", "program", "ticket", "call", "on call", "work", "project", "server", "work"),
+  excerpts = burnout_posts$selftext)
 
 code.team <- create.code(
   name = "Team members",
   definition = "References to other individuals working with the individual",
-  expressions = c("manager", "team lead"),
-  excerpts = burn_posts$selftext)
+  expressions = c("manager", "team lead", "tech", "management"),
+  excerpts = burnout_posts$selftext)
 
 code.users <- create.code(
   name = "Users",
   definition = "References to individuals who are receiving tech support",
-  expressions = c("users"),
-  excerpts = burn_posts$selftext)
+  expressions = c("users", "higher ups", "ceo"),
+  excerpts = burnout_posts$selftext)
 
 code.company <- create.code(
   name = "Company culture and policies",
   definition = "Official policies or unofficial corporate culture",
-  excerpts = burn_posts$selftext)
+  excerpts = burnout_posts$selftext)
 
 ```
